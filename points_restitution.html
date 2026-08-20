@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Points de restitution</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@600;700&display=swap');
+  :root{
+    --bg:#F5F6F7; --surface:#FFFFFF; --surface-2:#EEF0F2; --line:#DDE1E5;
+    --text:#1A1D20; --muted:#6B7280; --amber:#B8860B; --teal:#0E8A7D; --danger:#D9432B;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);}
+  body{
+    background:
+      radial-gradient(circle at 15% 0%, rgba(14,138,125,0.05), transparent 45%),
+      radial-gradient(circle at 90% 100%, rgba(184,134,11,0.05), transparent 40%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter', sans-serif;
+  }
+  .app-root{padding:20px 16px 40px;max-width:520px;margin:0 auto;}
+  .header{display:flex;align-items:center;gap:10px;margin-bottom:18px;}
+  .header-icon{width:38px;height:38px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:19px;}
+  .header h1{font-family:'Oswald', sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em;text-transform:uppercase;margin:0;}
+  .header p{margin:2px 0 0;font-size:12.5px;color:var(--muted);}
+
+  .search-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;}
+  .search-row{display:flex;gap:8px;}
+  .search-input-wrap{flex:1;position:relative;}
+  .search-input-wrap .ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);}
+  input[type="text"]{width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:11px 12px 11px 34px;color:var(--text);font-size:14.5px;font-family:'Inter', sans-serif;outline:none;}
+  input[type="text"]::placeholder{color:var(--muted);}
+  input[type="text"]:focus{border-color:var(--teal);}
+  .btn{border:none;border-radius:9px;font-family:'Inter', sans-serif;font-weight:600;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:transform .12s ease, opacity .12s ease;}
+  .btn:active{transform:scale(0.96);}
+  .btn:disabled{opacity:0.5;cursor:default;}
+  .btn-primary{background:var(--amber);color:#1A1300;padding:0 16px;height:42px;}
+  .btn-geo{width:100%;margin-top:10px;background:transparent;border:1px dashed var(--line);color:var(--teal);padding:10px;}
+  .btn-geo:hover{border-color:var(--teal);}
+  .btn-retry{width:100%;margin-top:8px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);padding:9px;}
+  .status-row{margin-top:10px;font-size:12.5px;color:var(--muted);display:flex;align-items:flex-start;gap:6px;}
+  .status-row.err{color:var(--danger);}
+  .status-row.warn{color:var(--amber);}
+  .spin{animation:spin 0.8s linear infinite;display:inline-block;flex-shrink:0;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .geo-progress{font-size:11.5px;color:var(--muted);text-align:center;margin-top:8px;}
+
+  .map-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:14px;}
+  .map-el{width:100%;height:230px;border-radius:9px;overflow:hidden;background:var(--surface-2);}
+  .leaflet-container{background:var(--surface-2) !important;font-family:'Inter', sans-serif;}
+  .user-pin{width:14px;height:14px;border-radius:50%;background:var(--teal);border:2px solid #fff;box-shadow:0 0 0 5px rgba(14,138,125,0.2);}
+  .center-pin{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-weight:700;font-size:12.5px;color:#14171A;border:2px solid rgba(20,23,26,0.7);}
+
+  .results-label{font-family:'Oswald', sans-serif;text-transform:uppercase;font-size:12px;letter-spacing:0.08em;color:var(--muted);margin:4px 2px 10px;}
+  .results-label b{color:var(--text);}
+  .result-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;display:flex;gap:12px;align-items:center;}
+  .result-card.rank-0{border-color:rgba(184,134,11,0.5);}
+  .rank-badge{font-family:'Oswald', sans-serif;font-weight:700;font-size:15px;width:30px;height:30px;border-radius:8px;background:var(--surface-2);color:var(--muted);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .rank-badge.top{background:var(--amber);color:#1A1300;}
+  .result-info{flex:1;min-width:0;}
+  .result-name{font-family:'Oswald', sans-serif;font-weight:600;font-size:15.5px;margin:0 0 3px;}
+  .result-addr{font-size:12px;color:var(--muted);line-height:1.4;}
+  .stat-box{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;}
+  .stat-dist{font-family:'JetBrains Mono', monospace;font-weight:700;font-size:16px;color:var(--teal);}
+  .stat-dur{font-family:'Inter', sans-serif;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:3px;}
+  .empty-hint{text-align:center;padding:26px 12px;color:var(--muted);font-size:13px;border:1px dashed var(--line);border-radius:14px;}
+</style>
+</head>
+<body>
+<div class="app-root">
+  <div class="header">
+    <div class="header-icon">🚗</div>
+    <div>
+      <h1>Points de restitution</h1>
+      <p>Distance et itinéraire réels vers les 3 centres les plus proches</p>
+    </div>
+  </div>
+
+  <div class="search-card">
+    <div class="search-row">
+      <div class="search-input-wrap">
+        <span class="ic">🔍</span>
+        <input type="text" id="queryInput" placeholder="Code postal ou ville" />
+      </div>
+      <button class="btn btn-primary" id="searchBtn">Chercher</button>
+    </div>
+    <button class="btn btn-geo" id="geoBtn">🧭 Utiliser ma position actuelle</button>
+    <div id="geoProgress" class="geo-progress">Chargement des centres…</div>
+    <div id="statusArea"></div>
+  </div>
+
+  <div class="map-card"><div class="map-el" id="map"></div></div>
+
+  <div id="resultsArea">
+    <div class="empty-hint">Indiquez un code postal, une ville, ou utilisez votre position pour afficher les centres les plus proches par la route.</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const CENTERS = [
+  { id:"aix", name:"Aix-en-Provence", line1:"LE SHED - Route de la Côte d'Azur, RN 7", line2:"13590 Meyreuil", query:"Route de la Côte d'Azur, 13590 Meyreuil" },
+  { id:"annecy", name:"Annecy", line1:"25 route de la Salle", line2:"74960 Cran-Gevrier", query:"25 route de la Salle, 74960 Cran-Gevrier" },
+  { id:"bordeaux", name:"Bordeaux", line1:"30 rue du 503e Régiment du Train", line2:"33127 Martignas-sur-Jalle", query:"30 rue du 503e Régiment du Train, 33127 Martignas-sur-Jalle" },
+  { id:"chilly", name:"Chilly-Mazarin", line1:"Rue Hélène Boucher, Butte au Berger", line2:"91380 Chilly-Mazarin", query:"Rue Hélène Boucher, 91380 Chilly-Mazarin" },
+  { id:"lille", name:"Lille", line1:"121 Rue Pierre Brizon", line2:"59810 Lesquin", query:"121 Rue Pierre Brizon, 59810 Lesquin" },
+  { id:"lyon", name:"Lyon", line1:"145 Route de Grenoble", line2:"69800 Saint-Priest", query:"145 Route de Grenoble, 69800 Saint-Priest" },
+  { id:"mulhouse", name:"Mulhouse", line1:"2 Avenue de Lisbonne", line2:"68110 Illzach", query:"2 Avenue de Lisbonne, 68110 Illzach" },
+  { id:"nanterre", name:"Nanterre Lavoisier", line1:"19 rue Lavoisier", line2:"92000 Nanterre", query:"19 rue Lavoisier, 92000 Nanterre" },
+  { id:"nantes", name:"Nantes", line1:"1 Rue des Châtaigniers, Parc du Butay", line2:"44690 Château-Thébaud", query:"1 Rue des Châtaigniers, 44690 Château-Thébaud" },
+  { id:"nice", name:"Nice", line1:"1ère Avenue – 15ème Rue", line2:"06510 Carros", query:"1ere Avenue 15eme Rue, 06510 Carros" },
+  { id:"rennes", name:"Rennes", line1:"3 Impasse de la Croix Rouge", line2:"35520 La Chapelle-des-Fougeretz", query:"3 Impasse de la Croix Rouge, 35520 La Chapelle des Fougeretz" },
+  { id:"strasbourg", name:"Strasbourg", line1:"15 allée des Forgerons", line2:"67960 Entzheim", query:"15 allee des Forgerons, 67960 Entzheim" },
+  { id:"toulouse", name:"Toulouse", line1:"1 Avenue de l'Industrie", line2:"31150 Bruguières", query:"1 Avenue de l'Industrie, 31150 Bruguieres" },
+  { id:"tours", name:"Tours", line1:"Avenue des Landes du Cassantin, ZAC du Cassantin", line2:"37210 Parçay-Meslay", query:"Avenue des Landes du Cassantin, 37210 Parcay Meslay" },
+];
+const RANK_COLORS = ["#B8860B", "#0E8A7D", "#6B7280"];
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+let centers = CENTERS.map(c => ({...c, lat:null, lon:null}));
+let map, layerGroup, userCoords = null, lastAction = null;
+
+function formatDuration(seconds){
+  const totalMin = Math.round(seconds / 60);
+  if (totalMin < 60) return `${totalMin} min`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m === 0 ? `${h} h` : `${h} h ${String(m).padStart(2, "0")} min`;
+}
+
+async function fetchWithTimeout(url, ms=9000){
+  const ctrl = new AbortController();
+  const t = setTimeout(()=>ctrl.abort(), ms);
+  try { return await fetch(url, {signal: ctrl.signal}); } finally { clearTimeout(t); }
+}
+async function geocode(query){
+  const url = `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=1`;
+  const res = await fetchWithTimeout(url);
+  if(!res.ok) throw new Error("geocode failed");
+  const data = await res.json();
+  if(!data.features || data.features.length===0) return null;
+  const [lon, lat] = data.features[0].geometry.coordinates;
+  return { lat, lon, label: data.features[0].properties.label };
+}
+async function osrmDistance(lat1,lon1,lat2,lon2){
+  const url = `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=false`;
+  const res = await fetchWithTimeout(url);
+  if(!res.ok) return null;
+  const data = await res.json();
+  if(data.code!=="Ok" || !data.routes?.length) return null;
+  return { distance:data.routes[0].distance, duration:data.routes[0].duration };
+}
+async function osrmRoute(lat1,lon1,lat2,lon2){
+  const url = `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`;
+  const res = await fetchWithTimeout(url);
+  if(!res.ok) return null;
+  const data = await res.json();
+  if(data.code!=="Ok" || !data.routes?.length) return null;
+  return { distance:data.routes[0].distance, duration:data.routes[0].duration, geometry:data.routes[0].geometry };
+}
+
+function setStatus(html, cls){
+  document.getElementById('statusArea').innerHTML = html ? `<div class="status-row ${cls||''}">${html}</div>` : '';
+}
+function setBusy(isBusy){
+  document.getElementById('searchBtn').disabled = isBusy;
+  document.getElementById('geoBtn').disabled = isBusy;
+}
+
+async function initCenters(){
+  for(const c of centers){
+    try {
+      const g = await geocode(c.query);
+      c.lat = g?.lat ?? null;
+      c.lon = g?.lon ?? null;
+    } catch { c.lat = null; c.lon = null; }
+  }
+  document.getElementById('geoProgress').style.display = 'none';
+}
+
+function initMap(){
+  map = L.map('map', {zoomControl:true, attributionControl:true}).setView([46.6,2.4], 5.3);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution:'© OpenStreetMap, © CARTO', subdomains:'abcd', maxZoom:19
+  }).addTo(map);
+  layerGroup = L.layerGroup().addTo(map);
+}
+
+function renderResults(results){
+  if(results.length===0) return;
+  const area = document.getElementById('resultsArea');
+  let html = `<div class="results-label">Les <b>3 centres</b> les plus proches (route)</div>`;
+  results.forEach((r,i)=>{
+    html += `<div class="result-card rank-${i}">
+      <div class="rank-badge ${i===0?'top':''}">${i+1}</div>
+      <div class="result-info">
+        <p class="result-name">${r.name}</p>
+        <p class="result-addr">${r.line1}<br>${r.line2}</p>
+      </div>
+      <div class="stat-box">
+        <span class="stat-dist">${(r.distance/1000).toFixed(1)} km</span>
+        <span class="stat-dur">⏱ ${formatDuration(r.duration)}</span>
+      </div>
+    </div>`;
+  });
+  area.innerHTML = html;
+
+  layerGroup.clearLayers();
+  const userIcon = L.divIcon({className:'', html:`<div class="user-pin"></div>`, iconSize:[16,16]});
+  L.marker([userCoords.lat, userCoords.lon], {icon:userIcon}).addTo(layerGroup);
+  const bounds = [[userCoords.lat, userCoords.lon]];
+  results.forEach((r,i)=>{
+    if(r.geometry){
+      const latlngs = r.geometry.coordinates.map(([lon,lat])=>[lat,lon]);
+      L.polyline(latlngs, {color:RANK_COLORS[i], weight:3.5, opacity:0.85}).addTo(layerGroup);
+      latlngs.forEach(p=>bounds.push(p));
+    }
+    const icon = L.divIcon({className:'', html:`<div class="center-pin" style="background:${RANK_COLORS[i]}">${i+1}</div>`, iconSize:[24,24]});
+    L.marker([r.lat, r.lon], {icon}).addTo(layerGroup);
+    bounds.push([r.lat, r.lon]);
+  });
+  map.fitBounds(bounds, {padding:[28,28]});
+}
+
+async function computeResults(lat, lon, label){
+  userCoords = {lat, lon};
+  setBusy(true);
+  const valid = centers.filter(c=>c.lat!==null && c.lon!==null);
+  const withDist = [];
+  let done = 0;
+  for(const c of valid){
+    try {
+      const r = await osrmDistance(lat, lon, c.lat, c.lon);
+      if(r) withDist.push({...c, distance:r.distance, duration:r.duration});
+    } catch {}
+    done++;
+    setStatus(`<span class="spin">⏳</span> Calcul des itinéraires réels… (${done}/${valid.length})`);
+    await sleep(300);
+  }
+  if(withDist.length===0){
+    setBusy(false);
+    setStatus("⚠️ Le service d'itinéraire ne répond pas pour le moment. Réessayez dans une minute.<br><button class='btn btn-retry' onclick='retry()'>🔄 Réessayer</button>", "err");
+    return;
+  }
+  const sorted = withDist.sort((a,b)=>a.distance-b.distance).slice(0,3);
+  const withGeom = [];
+  for(const c of sorted){
+    try {
+      const g = await osrmRoute(lat, lon, c.lat, c.lon);
+      withGeom.push({...c, geometry: g?.geometry ?? null});
+    } catch { withGeom.push({...c, geometry:null}); }
+    await sleep(300);
+  }
+  setBusy(false);
+  const warn = withDist.length < valid.length ? "⚠️ Certains centres n'ont pas pu être calculés. " : "";
+  setStatus(`${warn}📍 Depuis : ${label}`, warn ? "warn" : "");
+  renderResults(withGeom);
+}
+
+async function handleSearch(){
+  const q = document.getElementById('queryInput').value.trim();
+  if(!q) return;
+  lastAction = {type:'search', value:q};
+  setBusy(true);
+  setStatus(`<span class="spin">⏳</span> Recherche de l'adresse…`);
+  try {
+    const g = await geocode(q + ", France");
+    if(!g){
+      setBusy(false);
+      setStatus("Aucune localisation trouvée pour cette recherche.", "err");
+      return;
+    }
+    await computeResults(g.lat, g.lon, g.label);
+  } catch {
+    setBusy(false);
+    setStatus("La recherche a échoué. Vérifiez votre connexion et réessayez.<br><button class='btn btn-retry' onclick='retry()'>🔄 Réessayer</button>", "err");
+  }
+}
+
+function handleGeolocate(){
+  lastAction = {type:'geo'};
+  if(!navigator.geolocation){
+    setStatus("La géolocalisation n'est pas disponible sur cet appareil.", "err");
+    return;
+  }
+  setBusy(true);
+  setStatus(`<span class="spin">⏳</span> Localisation en cours…`);
+  navigator.geolocation.getCurrentPosition(
+    (pos)=> computeResults(pos.coords.latitude, pos.coords.longitude, "Ma position actuelle"),
+    (err)=>{
+      setBusy(false);
+      const msg = err.code===1 ? "Localisation refusée. Autorisez l'accès à la position, puis réessayez." : "Impossible d'obtenir votre position. Réessayez.";
+      setStatus(msg, "err");
+    },
+    { enableHighAccuracy:true, timeout:12000 }
+  );
+}
+function retry(){ if(!lastAction) return; lastAction.type==='search' ? handleSearch() : handleGeolocate(); }
+
+document.getElementById('searchBtn').addEventListener('click', handleSearch);
+document.getElementById('queryInput').addEventListener('keydown', e => { if(e.key==='Enter') handleSearch(); });
+document.getElementById('geoBtn').addEventListener('click', handleGeolocate);
+
+initMap();
+initCenters();
+</script>
+</body>
+</html>
